@@ -12,6 +12,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -226,16 +227,40 @@ def run_fabric(args: list[str], text_input: Optional[str]) -> tuple[int, float, 
             errors="replace",
             bufsize=1,
         )
+        write_errors: list[OSError] = []
+        writer: Optional[threading.Thread] = None
+
         if text_input is not None and process.stdin is not None:
-            process.stdin.write(text_input)
-            process.stdin.close()
-            process.stdin = None
+            stdin_pipe = process.stdin
+
+            def send_input() -> None:
+                try:
+                    stdin_pipe.write(text_input)
+                    stdin_pipe.flush()
+                except OSError as exc:
+                    write_errors.append(exc)
+                finally:
+                    try:
+                        stdin_pipe.close()
+                    except OSError as exc:
+                        write_errors.append(exc)
+
+            # Read Fabric output while a separate thread feeds its input.
+            # This avoids deadlock when both process pipes fill up.
+            writer = threading.Thread(target=send_input, daemon=True)
+            writer.start()
+
         assert process.stdout is not None
         for line in process.stdout:
             line = line.rstrip("\r\n")
             output_lines.append(line)
             print(line)
+        process.stdout.close()
         return_code = process.wait()
+        if writer is not None:
+            writer.join()
+        if write_errors and return_code == 0:
+            raise RuntimeError(f"Could not send input to Fabric: {write_errors[0]}")
     except OSError as exc:
         raise RuntimeError(f"Could not start Fabric: {exc}") from exc
     finally:
@@ -296,9 +321,10 @@ def main() -> int:
         exit_code, elapsed, output_lines = run_fabric(args, text_input)
         if exit_code == 0:
             print(f"\nFabric completed in {elapsed:.1f} seconds.")
+            save_markdown(source, selected_model, elapsed, output_lines)
         else:
             print(f"\nFabric exited with code {exit_code} after {elapsed:.1f} seconds.")
-        save_markdown(source, selected_model, elapsed, output_lines)
+            print("Summary was not saved because Fabric did not complete successfully.")
         return exit_code
     except KeyboardInterrupt:
         print("\nCancelled.")

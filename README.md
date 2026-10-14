@@ -87,8 +87,6 @@ git clone https://github.com/backyard-labs/fabric-local-summarizer.git
 cd fabric-local-summarizer
 ```
 
-**Note:** This repository is initially private. Cloning requires authorized GitHub access until the repository is made public.
-
 ### 3. Run the PowerShell Version
 
 ```powershell
@@ -225,12 +223,11 @@ fabric-local-summarizer/
 ├── .gitignore
 ├── Fabric-Summarize.ps1
 ├── Fabric-Summarize.py
+├── LICENSE
 ├── README.md
 └── docs/
     └── PowerShell-Known-Good-Scripts-Runbook.md
 ```
-
-A license file will be added before the initial release.
 
 ## AI-Assisted Development Disclosure
 
@@ -272,4 +269,4 @@ This repository is an independent helper utility. It is not affiliated with or o
 
 ## License
 
-MIT License. See `LICENSE` for details once added.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

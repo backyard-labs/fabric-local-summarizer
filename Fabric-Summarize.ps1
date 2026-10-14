@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <##
 .SYNOPSIS
     Interactively summarizes web pages, YouTube transcripts, local documents,
@@ -326,6 +326,8 @@ try {
     }
     else {
         Write-Host ('Fabric exited with code {0} after {1:N1} seconds.' -f $fabricExitCode, $timer.Elapsed.TotalSeconds) -ForegroundColor Red
+        Write-Host 'Summary was not saved because Fabric did not complete successfully.' -ForegroundColor Yellow
+        exit $fabricExitCode
     }
 
     $saveChoice = (Read-Host 'Save the output to a Markdown file? [y/N]').Trim()
@@ -362,11 +364,8 @@ try {
         }
     }
 
-    if ($fabricExitCode -ne 0) {
-        return
-    }
 }
 catch {
     Write-Host "`nError: $($_.Exception.Message)" -ForegroundColor Red
-    return
+    exit 1
 }
