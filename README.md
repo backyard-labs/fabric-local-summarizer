@@ -247,6 +247,14 @@ ChatGPT generated the source-code implementations and assisted with troubleshoot
 
 This disclosure is intended to provide transparency about how the project was developed, while distinguishing human direction, testing, and project ownership from AI-generated implementation.
 
+## Release Verification and Validation
+
+The initial public release (`v0.1.0`) underwent a risk-based verification and validation process covering functional behavior, failure handling, regression testing, documentation accuracy, repository hygiene, and release integrity.
+
+The methodology, test evidence, findings, corrective actions, and residual risks are documented in the [v0.1.0 Release Verification and Validation Report](docs/release-verification-validation-v0.1.0.md).
+
+This retrospective report was added after the initial release and does not constitute an independent security audit or comprehensive certification.
+
 ### AI-Generated Code Disclaimer
 
 AI-generated code may contain errors, security vulnerabilities, incorrect assumptions, or unexpected behavior.
