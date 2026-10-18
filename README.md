@@ -2,6 +2,8 @@
 
 An interactive Windows command-line utility for summarizing web pages, YouTube transcripts, local documents, and media using [Fabric](https://github.com/danielmiessler/fabric) and [Ollama](https://ollama.com/).
 
+> **YouTube transcript availability:** YouTube can throttle transcript requests made through Fabric/yt-dlp. Both scripts use the same retrieval path, and their default five-second request delay is a mitigation, not a guarantee. Avoid rapid retries after throttling. When a transcript is available, use YouTube's **Show transcript** feature, save the transcript as a text file, and summarize it with source option **3**. Transcript availability varies by video.
+
 The project includes two implementations:
 
 - **PowerShell:** `Fabric-Summarize.ps1`

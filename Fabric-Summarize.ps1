@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <##
 .SYNOPSIS
     Interactively summarizes web pages, YouTube transcripts, local documents,
@@ -25,6 +25,7 @@ $ErrorActionPreference = 'Stop'
 # Soft alert for local text and extracted documents. This is a practical
 # safeguard, not a model-specific context limit; adjust it if desired.
 $LongInputWarningChars = 8000
+$YouTubeRequestDelaySeconds = 5
 
 function Read-RequiredInput {
     param([Parameter(Mandatory = $true)][string]$Prompt)
@@ -208,8 +209,11 @@ try {
             if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
                 throw "yt-dlp was not found in PATH. Install it, open a new terminal, and confirm 'yt-dlp --version' works."
             }
+            Write-Host "YouTube may throttle transcript requests. Avoid rapid retries; if available, use YouTube's Show transcript feature, save it as a text file, and summarize it with source option 3." -ForegroundColor Yellow
             $source = Read-RequiredInput 'Enter the YouTube video URL'
-            $fabricArgs = @('-y', $source, '-p', 'summarize')
+            # Adjustable pacing helps reduce the chance of YouTube 429 errors.
+            $ytDlpArgs = "--yt-dlp-args=--sleep-requests $YouTubeRequestDelaySeconds"
+            $fabricArgs = @('-y', $source, '-p', 'summarize', $ytDlpArgs)
         }
         '3' {
             $textFileFilter = 'Text files (*.txt;*.text;*.md;*.markdown;*.vtt;*.srt;*.log;*.csv)|*.txt;*.text;*.md;*.markdown;*.vtt;*.srt;*.log;*.csv|All files (*.*)|*.*'
@@ -327,6 +331,10 @@ try {
     else {
         Write-Host ('Fabric exited with code {0} after {1:N1} seconds.' -f $fabricExitCode, $timer.Elapsed.TotalSeconds) -ForegroundColor Red
         Write-Host 'Summary was not saved because Fabric did not complete successfully.' -ForegroundColor Yellow
+        $fabricOutputText = $script:FabricOutput -join [Environment]::NewLine
+        if ($sourceType -eq '2' -and ($fabricOutputText -match '(?i)YouTube rate limit exceeded' -or $fabricOutputText -match '(?i)YouTube.*429.*rate limit')) {
+            Write-Host "YouTube appears to be throttling transcript requests. Avoid rapid retries. When available, use YouTube's Show transcript feature, save the transcript as a text file, then summarize it with source option 3." -ForegroundColor Yellow
+        }
         exit $fabricExitCode
     }
 

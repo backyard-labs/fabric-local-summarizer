@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 LONG_INPUT_WARNING_CHARS = 8_000
+YOUTUBE_REQUEST_DELAY_SECONDS = 5
 TEXT_EXTENSIONS = {".txt", ".text", ".md", ".markdown", ".vtt", ".srt", ".log", ".csv"}
 
 
@@ -153,8 +154,11 @@ def choose_source() -> tuple[str, list[str], Optional[str]]:
         args = ["-u", source, "-p", "summarize"]
     elif source_type == "2":
         require_command("yt-dlp", "YouTube transcript retrieval")
+        print("YouTube may throttle transcript requests. Avoid rapid retries; if available, use YouTube's Show transcript feature, save it as a text file, and summarize it with source option 3.")
         source = read_required("Enter the YouTube video URL")
-        args = ["-y", source, "-p", "summarize"]
+        # Adjustable pacing helps reduce the chance of YouTube 429 errors.
+        yt_dlp_args = f"--yt-dlp-args=--sleep-requests {YOUTUBE_REQUEST_DELAY_SECONDS}"
+        args = ["-y", source, "-p", "summarize", yt_dlp_args]
     elif source_type == "3":
         path = read_local_file_path(
             "Select a plain-text file to summarize",
@@ -215,6 +219,7 @@ def run_fabric(args: list[str], text_input: Optional[str]) -> tuple[int, float, 
     fabric = require_command("fabric", "Running Fabric")
     command = [fabric, *args]
     output_lines: list[str] = []
+    write_errors: list[OSError] = []
     start = time.perf_counter()
     try:
         process = subprocess.Popen(
@@ -227,9 +232,7 @@ def run_fabric(args: list[str], text_input: Optional[str]) -> tuple[int, float, 
             errors="replace",
             bufsize=1,
         )
-        write_errors: list[OSError] = []
         writer: Optional[threading.Thread] = None
-
         if text_input is not None and process.stdin is not None:
             stdin_pipe = process.stdin
 
@@ -245,11 +248,8 @@ def run_fabric(args: list[str], text_input: Optional[str]) -> tuple[int, float, 
                     except OSError as exc:
                         write_errors.append(exc)
 
-            # Read Fabric output while a separate thread feeds its input.
-            # This avoids deadlock when both process pipes fill up.
             writer = threading.Thread(target=send_input, daemon=True)
             writer.start()
-
         assert process.stdout is not None
         for line in process.stdout:
             line = line.rstrip("\r\n")
@@ -321,10 +321,13 @@ def main() -> int:
         exit_code, elapsed, output_lines = run_fabric(args, text_input)
         if exit_code == 0:
             print(f"\nFabric completed in {elapsed:.1f} seconds.")
-            save_markdown(source, selected_model, elapsed, output_lines)
         else:
             print(f"\nFabric exited with code {exit_code} after {elapsed:.1f} seconds.")
             print("Summary was not saved because Fabric did not complete successfully.")
+            if is_youtube_source(args) and is_youtube_rate_limit(output_lines):
+                print_youtube_rate_limit_guidance()
+            return exit_code
+        save_markdown(source, selected_model, elapsed, output_lines)
         return exit_code
     except KeyboardInterrupt:
         print("\nCancelled.")
@@ -332,6 +335,19 @@ def main() -> int:
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"\nError: {exc}", file=sys.stderr)
         return 1
+
+
+def is_youtube_source(args: list[str]) -> bool:
+    return "-y" in args
+
+
+def is_youtube_rate_limit(lines: list[str]) -> bool:
+    output = "\n".join(lines).casefold()
+    return "youtube rate limit exceeded" in output or ("youtube" in output and "429" in output and "rate limit" in output)
+
+
+def print_youtube_rate_limit_guidance() -> None:
+    print("YouTube appears to be throttling transcript requests. Avoid rapid retries. When available, use YouTube's Show transcript feature, save the transcript as a text file, then summarize it with source option 3.")
 
 
 if __name__ == "__main__":
